@@ -1,0 +1,87 @@
+[
+    {
+        "name": "Sword & Shield",
+        "code": "SWSH",  
+        "id": "swsh1"
+    },
+    {
+        "name": "Rebel Clash",
+        "code": "RCL",  
+        "id": "swsh2"
+    },
+    {
+        "name": "Darkness Ablaze",
+        "code": "DAA",  
+        "id": "swsh3"
+    },
+    {
+        "name": "Champion's Path",
+        "code": "CPA",  
+        "id": "swsh3.5"
+    },
+    {
+        "name": "Vivid Voltage",
+        "code": "VIV",  
+        "id": "swsh4"
+    },
+    {
+        "name": "Shining Fates",
+        "code": "SHF",  
+        "id": "swsh4.5"
+    },
+    {
+        "name": "Battle Styles",
+        "code": "BST",  
+        "id": "swsh5"
+    },
+    {
+        "name": "Chilling Reign",
+        "code": "CRE",  
+        "id": "swsh6"
+    },
+    {
+        "name": "Evolving Skies",
+        "code": "EVS",  
+        "id": "swsh7"
+    },
+    {
+        "name": "Celebrations",
+        "code": "CEL",  
+        "id": "swsh7.5"
+    },
+    {
+        "name": "Fusion Strike",
+        "code": "FST",  
+        "id": "swsh8"
+    },
+    {
+        "name": "Brilliant Stars",
+        "code": "BRS",  
+        "id": "swsh9"
+    },
+    {
+        "name": "Astral Radiance",
+        "code": "ASR",  
+        "id": "swsh10"
+    },
+    {
+        "name": "Pokemon GO",
+        "code": "PGO",  
+        "id": "swsh10.5"
+    },
+    {
+        "name": "Lost Origin",
+        "code": "LOR",  
+        "id": "swsh11"
+    },
+    {
+        "name": "Silver Tempest",
+        "code": "SIT",  
+        "id": "swsh12"
+    },
+    {
+        "name": "Crown Zenith",
+        "code": "CRZ",  
+        "id": "swsh12.5"
+    }
+]
