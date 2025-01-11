@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-use std::io::{BufWriter, Write};
+use std::io::{ Write};
 use std::fs::OpenOptions;
 
 use reqwest::{ Client };
@@ -10,10 +9,9 @@ use std::fs::{File};
 use clap::{arg, Command, Parser};
 use regex::Regex;
 use serde::{Serialize, Deserialize};
-use url::Url;
 
 mod models;
-use models::cards::{DataCardMap, CardToPrice, SetMapping};
+use models::cards::{ sv_sets, swsh_sets,DataCardMap, CardToPrice, SetMapping};
 
 
 const POKEMON_TCG_URL: &'static str = "https://api.pokemontcg.io/v2/cards";
@@ -51,7 +49,7 @@ async fn fetch_prices(client: Client, key: String, cards: Vec<CardToPrice>) -> R
     // let mut file = File::open(PathBuf::from("/Users/magno-mestizo/Documents/GitHub/price_tracker/prices.txt")).expect("Failed to open Pricing file");
     let mut file = OpenOptions::new()
         .append(true)
-        .open("/Users/magno-mestizo/Documents/GitHub/price_tracker/prices.txt")
+        .open("./prices.txt")
         .expect("Unable to open file");
     
     let query_urls: Vec<String> = 
@@ -100,8 +98,10 @@ fn parse_pricing_file(file: &PathBuf) -> Result<Vec<models::cards::CardToPrice>,
     let contents = std::fs::read_to_string(file).expect("File Does Not Exist");
     let mut result = Vec::new();
     let pattern = Regex::new(r"'(?P<name>[^']+)'\s+(?P<set_code>\w{3})\s+(?P<number>\d{1,3})").unwrap();
-    let sv_set_name: Vec<SetMapping> = serde_json::from_str(std::fs::read_to_string(PathBuf::from(format!("{SET_MAPPINGS_DIR}/sv_set_mappings.json"))).unwrap().as_str()).unwrap();
-    let sw_set_name: Vec<SetMapping> = serde_json::from_str(std::fs::read_to_string(PathBuf::from(format!("{SET_MAPPINGS_DIR}/swsh_set_mappings.json"))).unwrap().as_str()).unwrap();
+    // let sv_set_name: Vec<SetMapping> = serde_json::from_str(std::fs::read_to_string(PathBuf::from(format!("{SET_MAPPINGS_DIR}/sv_set_mappings.json"))).unwrap().as_str()).unwrap();
+    // let sw_set_name: Vec<SetMapping> = serde_json::from_str(std::fs::read_to_string(PathBuf::from(format!("{SET_MAPPINGS_DIR}/swsh_set_mappings.json"))).unwrap().as_str()).unwrap();
+    let sv_sets = sv_sets();
+    let sw_sets = swsh_sets();
 
     for line in contents.lines() {
         let _processed = match pattern.captures(line) {
@@ -110,10 +110,17 @@ fn parse_pricing_file(file: &PathBuf) -> Result<Vec<models::cards::CardToPrice>,
                 let set_code = captures.name("set_code").unwrap().as_str();
                 let number = captures.name("number").unwrap().as_str();
                 let id: String = {
-                    sv_set_name.iter()
-                               .filter(|set| { set.code.clone().unwrap() == set_code })
-                               .map(|s| s.id.clone().unwrap())
-                               .collect()
+                    if let Some(s) = sv_sets.get(set_code) {
+                        s.clone()
+                    }else if let Some(s) = sw_sets.get(set_code) {
+                        s.clone()
+                    }else {
+                        return Err(format!("Set Not Found: {set_code}").into());
+                    }
+                    // sv_set_name.iter()
+                    //            .filter(|set| { set.code.clone().unwrap() == set_code })
+                    //            .map(|s| s.id.clone().unwrap())
+                    //            .collect()
                 };
                 result.push(CardToPrice{
                     name: Some(String::from(name)),
@@ -165,7 +172,7 @@ async fn main() -> Result<(), String> {
 
             let response = fetch_prices(client, api_key, cards).await;
             match response {
-                Ok(_) => {},
+                Ok(_) => { println!("Success: Fetched Prices")},
                 Err(e) => { eprintln!("Failed to process prices: {e}"); }
             }
             

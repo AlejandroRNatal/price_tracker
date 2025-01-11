@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 // We must keep the non-snake-case since the other clients use non-snake-case
-use std:: fmt;
+use std::{fmt};
+use std::collections::HashMap;
 
 use serde::{Serialize, Deserialize};
 
@@ -197,4 +198,43 @@ pub fn extract_price(c: Card) -> f32 {
         }
     };
     res
+}
+
+pub fn sv_sets() -> HashMap<String, String> {
+    HashMap::from([
+        ("SVI".into(), "sv1".into()),
+        ("PAL".into(), "sv2".into()),
+        ("OBF".into(), "sv3".into()),
+        ("MEW".into(), "sv3.5".into()),
+        ("PAR".into(), "sv4".into()),
+        ("PAF".into(), "sv4.5".into()),
+        ("TEF".into(), "sv5".into()),
+        ("TWM".into(), "sv6".into()),
+        ("SFA".into(), "sv6.5".into()),
+        ("SCR".into(), "sv7".into()),
+        ("SSP".into(), "sv8".into()),
+        ("PRE".into(), "sv8.5".into()),
+    ])
+}
+
+pub fn swsh_sets() -> HashMap<String, String> {
+    HashMap::from([
+        ("SWSH".into(), "swsh1".into()),
+        ("RCL".into(), "swsh2".into()),
+        ("DAA".into(), "swsh3".into()),
+        ("CPA".into(), "swsh3.5".into()),
+        ("VIV".into(), "swsh4".into()),
+        ("SHF".into(), "swsh4.5".into()),
+        ("BST".into(), "swsh5".into()),
+        ("CRE".into(), "swsh6".into()),
+        ("EVS".into(), "swsh7".into()),
+        ("CEL".into(), "swsh7.5".into()),
+        ("FST".into(), "swsh8".into()),
+        ("BRS".into(), "swsh9".into()),
+        ("ASR".into(), "swsh10".into()),
+        ("PGO".into(), "swsh10.5".into()),
+        ("LOR".into(), "swsh11".into()),
+        ("SIT".into(), "swsh12".into()),
+        ("CRZ".into(), "swsh12.5".into()),
+    ])
 }
