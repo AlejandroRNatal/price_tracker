@@ -12,30 +12,30 @@ pub struct DataCardMap {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Card {
-    id: Option<String>,
-    name: Option<String>,
-    supertype: Option<String>,
-    subtypes: Option<Vec<String>>,
-    hp: Option<String>,
-    types: Option<Vec<String>>,
-    evolvesTo: Option<Vec<String>>,
-    evolvesFrom:  Option<String>,
-    rules: Option<Vec<String>>,
-    abilities: Option<Vec<Ability>>,
-    attacks: Option<Vec<Attack>>,
-    weaknesses: Option<Vec<Weakness>>,
-    convertedRetreatCost: Option<u32>,
-    retreatCost: Option<Vec<String>>,
-    set: Option<CardSet>,
-    number: Option<String>,
-    artist: Option<String>,
-    rarity: Option<String>,
-    flavorText: Option<String>,
-    nationalPokedexNumbers: Option<Vec<u32>>,
-    legalities: Option<Legalities>,
-    images: Option<Images>,
-    tcgplayer: Option<TcgPlayer>,
-    cardmarket: Option<CardMarket>,
+    pub id: Option<String>,
+    pub name: Option<String>,
+    pub supertype: Option<String>,
+    pub subtypes: Option<Vec<String>>,
+    pub hp: Option<String>,
+    pub types: Option<Vec<String>>,
+    pub evolvesTo: Option<Vec<String>>,
+    pub evolvesFrom:  Option<String>,
+    pub rules: Option<Vec<String>>,
+    pub abilities: Option<Vec<Ability>>,
+    pub attacks: Option<Vec<Attack>>,
+    pub weaknesses: Option<Vec<Weakness>>,
+    pub convertedRetreatCost: Option<u32>,
+    pub retreatCost: Option<Vec<String>>,
+    pub set: Option<CardSet>,
+    pub number: Option<String>,
+    pub artist: Option<String>,
+    pub rarity: Option<String>,
+    pub flavorText: Option<String>,
+    pub nationalPokedexNumbers: Option<Vec<u32>>,
+    pub legalities: Option<Legalities>,
+    pub images: Option<Images>,
+    pub tcgplayer: Option<TcgPlayer>,
+    pub cardmarket: Option<CardMarket>,
 }
 
 impl fmt::Display for Card {
@@ -71,16 +71,16 @@ struct Weakness {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CardSet {
-    id: Option<String>,
-    name: Option<String>,
-    series: Option<String>,
-    printedTotal: Option<u32>,
-    total: Option<u32>,
-    legalities: Legalities,
-    ptcgoCode: Option<String>,
-    releaseDate: Option<String>,
-    updatedAt: Option<String>,
-    images: Option<SetImages>,
+    pub id: Option<String>,
+    pub name: Option<String>,
+    pub series: Option<String>,
+    pub printedTotal: Option<u32>,
+    pub total: Option<u32>,
+    pub legalities: Legalities,
+    pub ptcgoCode: Option<String>,
+    pub releaseDate: Option<String>,
+    pub updatedAt: Option<String>,
+    pub images: Option<SetImages>,
 }
 
 
@@ -167,8 +167,14 @@ pub struct SetMapping {
     pub code: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct Type;
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, PartialOrd)]
+pub struct Type(pub String);
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, PartialOrd)]
+pub struct Supertype(pub String);
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, PartialOrd)]
+pub struct Subtype(pub String);
 
 pub fn extract_price(c: Card) -> f32 {
     let res = -99.9;
