@@ -1,7 +1,6 @@
-use std::io::{ Write};
+use std::io::{ Write };
 use std::fs::OpenOptions;
 
-use client::client::{Pokemon, Query};
 use reqwest::{ Client };
 
 use std::path::PathBuf;
@@ -14,9 +13,10 @@ use serde::{Serialize, Deserialize};
 mod models;
 mod client;
 
-use crate::models::models::{ sv_sets, swsh_sets, Card, DataCardMap, CardToPrice };
+use crate::models::models::{ sv_sets, swsh_sets,DataCardMap, CardToPrice };
 use crate::client::client::{ POKEMON_TCG_URL, };
 
+// const POKEMON_TCG_URL: &'static str = "https://api.pokemontcg.io/v2/cards";
 const SET_MAPPINGS_DIR: &'static str = "./set_mappings";
 const CONFIG_DIR: &'static str = "./config";
 
@@ -47,25 +47,49 @@ impl Config {
     }
 }
 
-async fn fetch_prices(key: String, cards: Vec<CardToPrice>) -> Result<(), reqwest::Error> {
+async fn fetch_prices(client: Client, key: String, cards: Vec<CardToPrice>) -> Result<(), reqwest::Error> {
+    // let mut file = File::open(PathBuf::from("/Users/magno-mestizo/Documents/GitHub/price_tracker/prices.txt")).expect("Failed to open Pricing file");
     let mut file = OpenOptions::new()
         .append(true)
         .open("./prices.txt")
         .expect("Unable to open file");
+    
+    let query_urls: Vec<String> = 
+        cards.into_iter()
+             .map(|card| {
+                let name = card.name.unwrap_or("N/A".into());
+                let _set = card.ptcgoCode.unwrap_or("N/A".into());
+                let set_id: String = card.setId.unwrap_or("N/A".into());
+                let number = card.number.unwrap_or(999999);
 
-    let api = Pokemon::new(key);
+                // let url = String::from(format!("{POKEMON_TCG_URL}?q=name:{name} set.id:{set_id} number:{number}"));
+                // let url = String::from(format!("{POKEMON_TCG_URL}/xy1-1"));
+                let url = String::from(format!("{POKEMON_TCG_URL}/{set_id}-{number}"));
+                // let url = "api.pokemontcg.io/v2/cards?page=1&pageSize=250".to_string();
+                dbg!(&url);
+                url
+              })
+             .collect();
 
-    for card in cards.iter() {
-        let set_id: String = card.setId.clone().unwrap_or("N/A".into());
-        let number = card.number.unwrap_or(999999);
-        let id = String::from(format!("{set_id}-{number}"));
-        let may_card = api.find::<Card>(id).await;
-        if let Some(c) = may_card {
-            dbg!(&c);
-            let buff = format!("{}", c);
+    // here we query the server with the baked URLs
+    for url in query_urls.into_iter() {
+        if url.is_empty() { continue; }
+
+        let response = client.get(url)
+                                    .header("X-Api-Key", format!("{key}"))
+                                    .header("User-Agent", "Mozilla/5.0")
+                                    .send()
+                                    .await?
+                                    ;
+        let data_card_map =  response.json::<DataCardMap>().await?;
+    
+        dbg!(&data_card_map);
+        if let Some(card) = data_card_map.data {
+            let buff = format!("{}",card);
             dbg!(&buff);
-            file.write_all(buff.as_str().as_bytes()).expect("Failed to write out pricing to file");    
+            file.write_all(buff.as_str().as_bytes()).expect("Failed to write out pricing to file");
         }
+        
     }
     
     Ok(())
@@ -76,7 +100,8 @@ fn parse_pricing_file(file: &PathBuf) -> Result<Vec<CardToPrice>, String> {
     let contents = std::fs::read_to_string(file).expect("File Does Not Exist");
     let mut result = Vec::new();
     let pattern = Regex::new(r"'(?P<name>[^']+)'\s+(?P<set_code>\w{3})\s+(?P<number>\d{1,3})").unwrap();
-
+    // let sv_set_name: Vec<SetMapping> = serde_json::from_str(std::fs::read_to_string(PathBuf::from(format!("{SET_MAPPINGS_DIR}/sv_set_mappings.json"))).unwrap().as_str()).unwrap();
+    // let sw_set_name: Vec<SetMapping> = serde_json::from_str(std::fs::read_to_string(PathBuf::from(format!("{SET_MAPPINGS_DIR}/swsh_set_mappings.json"))).unwrap().as_str()).unwrap();
     let sv_sets = sv_sets();
     let sw_sets = swsh_sets();
 
@@ -94,6 +119,10 @@ fn parse_pricing_file(file: &PathBuf) -> Result<Vec<CardToPrice>, String> {
                     }else {
                         return Err(format!("Set Not Found: {set_code}").into());
                     }
+                    // sv_set_name.iter()
+                    //            .filter(|set| { set.code.clone().unwrap() == set_code })
+                    //            .map(|s| s.id.clone().unwrap())
+                    //            .collect()
                 };
                 result.push(CardToPrice{
                     name: Some(String::from(name)),
@@ -129,7 +158,9 @@ fn cli() -> Command {
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
-    let api_key = std::env::var("POKEMON_TCG_API_KEY").expect("Expected API Key Env Var");    
+    let api_key = std::env::var("POKEMON_TCG_API_KEY").expect("Expected API Key Env Var");
+    let client = Client::new();
+    
     let matches = cli().get_matches();
 
     match matches.subcommand() {
@@ -139,14 +170,14 @@ async fn main() -> Result<(), String> {
         Some(("price", submatches)) => {
             let price = submatches.get_one::<String>("PRICE").unwrap();
             let price_path = PathBuf::from(price);
-
             let cards = parse_pricing_file(&price_path).unwrap();
-            let response = fetch_prices(api_key, cards).await;
 
+            let response = fetch_prices(client, api_key, cards).await;
             match response {
                 Ok(_) => { println!("Success: Fetched Prices")},
                 Err(e) => { eprintln!("Failed to process prices: {e}"); }
             }
+            
         },
         _ => {
             panic!("Invalid Argument")

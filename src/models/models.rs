@@ -167,6 +167,9 @@ pub struct SetMapping {
     pub code: Option<String>,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Type;
+
 pub fn extract_price(c: Card) -> f32 {
     let res = -99.9;
     if let Some(card_market) = c.cardmarket {
