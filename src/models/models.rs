@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 // We must keep the non-snake-case since the other clients use non-snake-case
-use std::{fmt};
+use std::{ fmt };
 use std::collections::HashMap;
 
 use serde::{Serialize, Deserialize};
@@ -83,14 +83,12 @@ pub struct CardSet {
     pub images: Option<SetImages>,
 }
 
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Legalities {
     unlimited: Option<String>,
     standard: Option<String>,
     expanded: Option<String>,
 }
-
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct SetImages {
@@ -175,6 +173,9 @@ pub struct Supertype(pub String);
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, PartialOrd)]
 pub struct Subtype(pub String);
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, PartialOrd)]
+pub struct Rarity(pub String);
 
 pub fn extract_price(c: Card) -> f32 {
     let res = -99.9;

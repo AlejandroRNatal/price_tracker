@@ -2,13 +2,15 @@
 A Command Line Interface for checking the daily price of cards in a file.
 
 The primary CLI component is the main.rs file.
-However, the project contains a client subdirectory that stores all the querying logic. There are future plans to convert the client module into its own standalone library.
+However, the project contains a client subdirectory that stores all the querying logic for the opensource [Pokemon TCG API](https://docs.pokemontcg.io/). There are future plans to convert the client module into its own standalone library.
 
 ## CLI Usage
 
 ```
 POKEMON_TCG_API_KEY=YOUR_KEY_HERE cargo run -- price /path/to/cards/for/pricing.txt
 ```
+
+> The API Key here is provided by the wonderful people over at [PokemonTCG.io](https://pokemontcg.io/).
 
 ## API
 

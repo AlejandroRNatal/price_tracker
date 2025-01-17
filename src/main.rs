@@ -1,11 +1,9 @@
-use std::io::{ Write};
+use std::io::Write;
 use std::fs::OpenOptions;
 
 use client::client::{Pokemon, Query};
-use reqwest::{ Client };
 
 use std::path::PathBuf;
-use std::fs::{File};
 
 use clap::{arg, Command, Parser};
 use regex::Regex;
@@ -14,8 +12,8 @@ use serde::{Serialize, Deserialize};
 mod models;
 mod client;
 
-use crate::models::models::{ sv_sets, swsh_sets, Card, DataCardMap, CardToPrice };
-use crate::client::client::{ POKEMON_TCG_URL, };
+use crate::models::models::{ sv_sets, swsh_sets, Card, CardToPrice };
+use crate::models::errors::Error;
 
 const SET_MAPPINGS_DIR: &'static str = "./set_mappings";
 const CONFIG_DIR: &'static str = "./config";
@@ -47,24 +45,24 @@ impl Config {
     }
 }
 
-async fn fetch_prices(key: String, cards: Vec<CardToPrice>) -> Result<(), reqwest::Error> {
+async fn fetch_prices(key: String, cards: Vec<CardToPrice>) -> Result<(), Error> {
     let mut file = OpenOptions::new()
         .append(true)
         .open("./prices.txt")
-        .expect("Unable to open file");
+        .map_err(|_| { Error::FailedOpeningFile })?;
 
     let api = Pokemon::new(key);
 
     for card in cards.iter() {
         let set_id: String = card.setId.clone().unwrap_or("N/A".into());
         let number = card.number.unwrap_or(999999);
-        let id = String::from(format!("{set_id}-{number}"));
-        let may_card = api.find::<Card>(id).await;
-        if let Some(c) = may_card {
+        let id = format!("{set_id}-{number}");
+        let maybe_card = api.find::<Card>(&id).await;
+        if let Some(c) = maybe_card {
             dbg!(&c);
             let buff = format!("{}", c);
             dbg!(&buff);
-            file.write_all(buff.as_str().as_bytes()).expect("Failed to write out pricing to file");    
+            file.write_all(buff.as_str().as_bytes()).map_err(|_| { Error::FailedParsingFile })?;    
         }
     }
     
@@ -72,8 +70,8 @@ async fn fetch_prices(key: String, cards: Vec<CardToPrice>) -> Result<(), reqwes
 }
 
 // Expected Format: [\"]\w+[\"]\s+\w{3}\d{1-3}
-fn parse_pricing_file(file: &PathBuf) -> Result<Vec<CardToPrice>, String> {
-    let contents = std::fs::read_to_string(file).expect("File Does Not Exist");
+fn parse_pricing_file(file: &PathBuf) -> Result<Vec<CardToPrice>, Error> {
+    let contents = std::fs::read_to_string(file).map_err(|_| { Error::FailedOpeningFile })?;
     let mut result = Vec::new();
     let pattern = Regex::new(r"'(?P<name>[^']+)'\s+(?P<set_code>\w{3})\s+(?P<number>\d{1,3})").unwrap();
 
@@ -92,7 +90,7 @@ fn parse_pricing_file(file: &PathBuf) -> Result<Vec<CardToPrice>, String> {
                     }else if let Some(s) = sw_sets.get(set_code) {
                         s.clone()
                     }else {
-                        return Err(format!("Set Not Found: {set_code}").into());
+                        return Err(Error::MissingSetMapping { set: format!("{set_code}").into() });
                     }
                 };
                 result.push(CardToPrice{
@@ -128,8 +126,8 @@ fn cli() -> Command {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), String> {
-    let api_key = std::env::var("POKEMON_TCG_API_KEY").expect("Expected API Key Env Var");    
+async fn main() -> Result<(), Error> {
+    let api_key = std::env::var("POKEMON_TCG_API_KEY").map_err(|_| { Error::ApiKeyNotFound }).unwrap();
     let matches = cli().get_matches();
 
     match matches.subcommand() {
@@ -149,7 +147,7 @@ async fn main() -> Result<(), String> {
             }
         },
         _ => {
-            panic!("Invalid Argument")
+            panic!("Invalid Argument");
         },
     }
 
