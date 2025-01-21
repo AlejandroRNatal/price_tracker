@@ -1,24 +1,15 @@
 use std::io::Write;
 use std::fs::OpenOptions;
-
-use client::client::{Pokemon, Query};
-
 use std::path::PathBuf;
 
 use clap::{arg, Command, Parser};
 use regex::Regex;
 use serde::{Serialize, Deserialize};
 
-mod models;
-mod client;
+use pokemon_tcg_sdk::{Pokemon, Query};
+use pokemon_tcg_sdk::models::models::{ sv_sets, swsh_sets, Card, CardToPrice };
+use pokemon_tcg_sdk::models::errors::Error;
 
-use crate::models::models::{ sv_sets, swsh_sets, Card, CardToPrice };
-use crate::models::errors::Error;
-
-const SET_MAPPINGS_DIR: &'static str = "./set_mappings";
-const CONFIG_DIR: &'static str = "./config";
-
-const SET_MAPPING_CONVENTION: &'static str = "_set_mappings.json";
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
