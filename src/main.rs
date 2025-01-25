@@ -3,11 +3,13 @@ use std::fs::OpenOptions;
 use std::path::PathBuf;
 
 use clap::{arg, Command, Parser};
+use chrono::prelude::*;
+
 use regex::Regex;
 use serde::{Serialize, Deserialize};
 
-use pokemon_tcg_sdk::{Pokemon, Query};
-use pokemon_tcg_sdk::models::models::{ sv_sets, swsh_sets, Card, CardToPrice };
+use pokemon_tcg_sdk::{ Client, Query};
+use pokemon_tcg_sdk::models::models::{ sv_sets, swsh_sets, Card, CardToPrice, Set};
 use pokemon_tcg_sdk::models::errors::Error;
 
 
@@ -19,6 +21,12 @@ struct Args {
 
     #[arg(short, long, default_value_t = format!(""))]
     config_file_path: String,
+
+    #[arg(short, long)]
+    card: String,
+
+    #[arg(short, long)]
+    market: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -42,22 +50,60 @@ async fn fetch_prices(key: String, cards: Vec<CardToPrice>) -> Result<(), Error>
         .open("./prices.txt")
         .map_err(|_| { Error::FailedOpeningFile })?;
 
-    let api = Pokemon::new(key);
-
+    let api = Client::new(key);
+    let time = Utc::now();
     for card in cards.iter() {
         let set_id: String = card.setId.clone().unwrap_or("N/A".into());
         let number = card.number.unwrap_or(999999);
         let id = format!("{set_id}-{number}");
         let maybe_card = api.find::<Card>(&id).await;
         if let Some(c) = maybe_card {
-            dbg!(&c);
-            let buff = format!("{}", c);
-            dbg!(&buff);
+            let buff = format!("{} {}", time, c);
             file.write_all(buff.as_str().as_bytes()).map_err(|_| { Error::FailedParsingFile })?;    
         }
     }
     
     Ok(())
+}
+
+async fn fetch_card(api: String, card: String) -> Result< (), Error> {
+    let client = Client::new(api);
+    
+    let response = client.find::<Card>(&card ).await;
+    let card = response.unwrap();
+
+    let name = card.name.clone().unwrap();
+
+    let mut price = 0.0;
+    if let Some(tcg_player) = card.tcgplayer.clone() {
+        if let Some( prices) = tcg_player.prices.clone() {
+            if let Some(tcg_pricing) = prices.normal.clone() {
+                if let Some(market) = tcg_pricing.market.clone() {
+                    price = market;
+                }
+            }
+        }
+    }
+
+    if let Some(cardmarket) = card.cardmarket.clone() {
+        if let Some(prices) = cardmarket.prices.clone() {
+            if let Some(p) = prices.averageSellPrice.clone() {
+                price = p;
+            }
+        }
+    }
+
+    println!("{name} {price}");
+    Ok(())
+}
+
+async fn fetch_sets(api_key: String) {
+    let mut client = Client::new(api_key);
+
+    let sets = client.all::<Set>().await;
+
+    let sets: Vec<(String, String)> = sets.iter().map(|s| {(s.name.clone().unwrap(), s.id.clone().unwrap())} ).collect();
+    sets.iter().for_each(|s| println!("{}\t\t\t{}", s.0, s.1));
 }
 
 // Expected Format: [\"]\w+[\"]\s+\w{3}\d{1-3}
@@ -84,11 +130,13 @@ fn parse_pricing_file(file: &PathBuf) -> Result<Vec<CardToPrice>, Error> {
                         return Err(Error::MissingSetMapping { set: format!("{set_code}").into() });
                     }
                 };
-                result.push(CardToPrice{
-                    name: Some(String::from(name)),
-                    ptcgoCode: Some(String::from(set_code)),
-                    number: Some(number.parse::<u32>().unwrap_or(99999)),
-                    setId: Some(id),
+                
+                result.push(
+                    CardToPrice {
+                        name: Some(String::from(name)),
+                        ptcgoCode: Some(String::from(set_code)),
+                        number: Some(number.parse::<u32>().unwrap_or(99999)),
+                        setId: Some(id),
                 });
             },
             None => {
@@ -106,13 +154,21 @@ fn cli() -> Command {
                 Command::new("config")
                         .about("Specifies Configuration File Path to load")
                         .arg(arg!(<CONFIG_PATH> "The path to the configuration file"))
-                        .arg_required_else_help(true),
             )
             .subcommand(
                 Command::new("price")
                         .about("Specifies Cards To Price File Path")
                         .arg(arg!(<PRICE> "The path to the cards to be priced file"))
-                        .arg_required_else_help(true),
+            )
+            .subcommand(
+                Command::new("card")
+                .about("Single card to price")
+                .arg(arg!(<CARD> "The name of the card to be priced")),
+            )
+            .subcommand(
+                Command::new("sets")
+                .about("List sets")
+                .arg(arg!(-s --sets ... "Lists all sets Available"))
             )
 }
 
@@ -136,6 +192,13 @@ async fn main() -> Result<(), Error> {
                 Ok(_) => { println!("Success: Fetched Prices")},
                 Err(e) => { eprintln!("Failed to process prices: {e}"); }
             }
+        },
+        Some(("card", submatches)) => {
+            let card = submatches.get_one::<String>("CARD").unwrap();
+            fetch_card(api_key, card.clone()).await;
+        },
+        Some(("sets", _)) => {
+            fetch_sets(api_key).await;
         },
         _ => {
             panic!("Invalid Argument");
