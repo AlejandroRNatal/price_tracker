@@ -4,14 +4,22 @@ use std::path::PathBuf;
 
 use clap::{arg, Command, Parser};
 use chrono::prelude::*;
+use dotenv::dotenv;
 
 use regex::Regex;
+
 use serde::{Serialize, Deserialize};
+use sqlx::FromRow;
+use sqlx::SqlitePool;
+use sqlx::Row;
 
 use pokemon_tcg_sdk::{ Client, Query};
-use pokemon_tcg_sdk::models::models::{ sv_sets, swsh_sets, Card, CardToPrice, Set};
+use pokemon_tcg_sdk::models::models::{ sv_sets, swsh_sets, DataCardMap, Card, CardToPrice, Set };
 use pokemon_tcg_sdk::models::errors::Error;
 
+use sqlx::{migrate::MigrateDatabase, Sqlite};
+
+//const DB_URL: &'static str = dotenv("DATABASE_URL");
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -44,22 +52,132 @@ impl Config {
     }
 }
 
-async fn fetch_prices(key: String, cards: Vec<CardToPrice>) -> Result<(), Error> {
+#[derive(Clone, FromRow, Debug)]
+struct DBCard {
+    pub id: u64,
+    pub name: String,
+    pub card_id: String,
+    pub last_price: f64,
+    pub date: i64,
+}
+
+impl DBCard {
+    pub fn new(name: String, card_id: String, date: i64) -> Self {
+        Self {
+            id: 0,
+            name: name,
+            card_id: card_id,
+            last_price: 0.0,
+            date: date,
+        }
+    } 
+}
+
+fn extract_price(card: &Card) -> f64 {
+    match &card.tcgplayer {
+        Some(tcgp) => {
+            match &tcgp.prices {
+                Some(prices) => {
+                    if let Some(normal) = prices.normal.clone() {
+                        if let Some(market) = normal.market.clone() {
+                            return market as f64;
+                        } else {
+                            return -999.99;
+                        }
+                    }
+                    /*else if let Some(reverse) = prices.reverseHolofoil {
+                        if let Some(market) = reverse.market {
+                            return market as f64;
+                        } else {
+                            return -999.99;
+                        }
+                    }*/
+                    else {
+                        return -999.99;
+                    }
+                },
+                None => { -999.99 },
+            }
+        },
+        None => { eprintln!("Not priced: {}", card.name.clone().unwrap()); -999.99 },
+    }
+}
+
+async fn setup_db(db_url: &String) -> Result<(), String> {
+    if !Sqlite::database_exists(&db_url).await.unwrap_or(false) {
+        println!("Creating database {}", db_url);
+        match Sqlite::create_database(&db_url).await {
+            Ok(_) => println!("Create DB success"),
+            Err(error) => panic!("error: {}", error),
+        }
+    } else {
+        println!("Database already exists");
+        let db = SqlitePool::connect(&db_url).await.unwrap();
+        let result = sqlx::query("CREATE TABLE IF NOT EXISTS cards (id INTEGER PRIMARY KEY NOT NULL, name VARCHAR(250) NOT NULL, card_id VARCHAR(250) NOT NULL, last_price REAL NOT NULL, date INTEGER);").execute(&db).await.unwrap();
+        println!("Create user table result: {:?}", result);
+    }
+
+    Ok(())
+}
+
+async fn check_db_data(db_url: &String) -> Result<(), String> {
+    let db = SqlitePool::connect(&db_url).await.unwrap();
+    let result = sqlx::query(
+        "SELECT name
+         FROM sqlite_schema
+         WHERE type ='table' 
+         AND name NOT LIKE 'sqlite_%';",
+    )
+    .fetch_all(&db)
+    .await
+    .unwrap();
+    
+    for (idx, row) in result.iter().enumerate() {
+        println!("[{}]: {:?}", idx, row.get::<String, &str>("name"));
+    }
+    Ok(())
+}
+
+async fn insert_card(db_url: &String, card: DBCard) -> Result<(), String> {
+    let db = SqlitePool::connect(&db_url).await.unwrap();
+    let result = sqlx::query("INSERT INTO cards (name, card_id, last_price, date) VALUES (?)")
+        .bind(&card.name)
+        .bind(&card.card_id)
+        .bind(&card.last_price)
+        .bind(&card.date)
+        .execute(&db)
+        .await
+        .unwrap();
+    println!("Query result: {:?}", result);
+    Ok(())
+}
+
+async fn fetch_prices(key: String, db_url: &String, cards: Vec<CardToPrice>) -> Result<(), Error> {
     let mut file = OpenOptions::new()
         .append(true)
         .open("./prices.txt")
         .map_err(|_| { Error::FailedOpeningFile })?;
-
+    
     let api = Client::new(key);
     let time = Utc::now();
     for card in cards.iter() {
         let set_id: String = card.setId.clone().unwrap_or("N/A".into());
+
         let number = card.number.unwrap_or(999999);
         let id = format!("{set_id}-{number}");
         let maybe_card = api.find::<Card>(&id).await;
+        
+        let number = card.number.unwrap_or(999999);
+        let date = Utc::now().timestamp();
+
         if let Some(c) = maybe_card {
+            let mut db_card = DBCard::new(c.name.clone().unwrap(), format!("{id}-{number}"), date);
+            db_card.last_price = extract_price(&c);
+            insert_card(db_url, db_card).await;
+
             let buff = format!("{} {}", time, c);
-            file.write_all(buff.as_str().as_bytes()).map_err(|_| { Error::FailedParsingFile })?;    
+            file.write_all(buff.as_str().as_bytes())
+                .map_err(|_| { Error::FailedParsingFile })?;    
         }
     }
     
@@ -102,13 +220,18 @@ async fn fetch_sets(api_key: String) {
 
     let sets = client.all::<Set>().await;
 
-    let sets: Vec<(String, String)> = sets.iter().map(|s| {(s.name.clone().unwrap(), s.id.clone().unwrap())} ).collect();
+    let sets: Vec<(String, String)> = sets.iter()
+                                          .map(|s|
+                                                { (s.name.clone().unwrap(),
+                                                   s.id.clone().unwrap())} )
+                                          .collect();
     sets.iter().for_each(|s| println!("{}\t\t\t{}", s.0, s.1));
 }
 
 // Expected Format: [\"]\w+[\"]\s+\w{3}\d{1-3}
 fn parse_pricing_file(file: &PathBuf) -> Result<Vec<CardToPrice>, Error> {
-    let contents = std::fs::read_to_string(file).map_err(|_| { Error::FailedOpeningFile })?;
+    let contents = std::fs::read_to_string(file)
+                           .map_err(|_| { Error::FailedOpeningFile })?;
     let mut result = Vec::new();
     let pattern = Regex::new(r"'(?P<name>[^']+)'\s+(?P<set_code>\w{3})\s+(?P<number>\d{1,3})").unwrap();
 
@@ -137,7 +260,8 @@ fn parse_pricing_file(file: &PathBuf) -> Result<Vec<CardToPrice>, Error> {
                         ptcgoCode: Some(String::from(set_code)),
                         number: Some(number.parse::<u32>().unwrap_or(99999)),
                         setId: Some(id),
-                });
+                    }
+                );
             },
             None => {
                 continue;
@@ -174,22 +298,26 @@ fn cli() -> Command {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let api_key = std::env::var("POKEMON_TCG_API_KEY").map_err(|_| { Error::ApiKeyNotFound }).unwrap();
+    let DB_URL = std::env::var("DATABASE_URL").unwrap();
+    let api_key = std::env::var("POKEMON_TCG_API_KEY")
+                     .map_err(|_| { Error::ApiKeyNotFound })
+                     .unwrap();
     let matches = cli().get_matches();
 
     match matches.subcommand() {
         Some(("config", submatches)) => {
-            let config_path = submatches.get_one::<String>("CONFIG_PATH").map(|s| s.to_string());
+            let config_path = submatches.get_one::<String>("CONFIG_PATH")
+                                        .map(|s| s.to_string());
         },
         Some(("price", submatches)) => {
             let price = submatches.get_one::<String>("PRICE").unwrap();
             let price_path = PathBuf::from(price);
 
             let cards = parse_pricing_file(&price_path).unwrap();
-            let response = fetch_prices(api_key, cards).await;
+            let response = fetch_prices(api_key, &DB_URL, cards).await;
 
             match response {
-                Ok(_) => { println!("Success: Fetched Prices")},
+                Ok(_) => { println!("Success: Fetched Prices"); },
                 Err(e) => { eprintln!("Failed to process prices: {e}"); }
             }
         },
@@ -206,4 +334,14 @@ async fn main() -> Result<(), Error> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_database() {
+        
+    }
 }
