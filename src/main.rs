@@ -9,17 +9,13 @@ use dotenv::dotenv;
 use regex::Regex;
 
 use serde::{Serialize, Deserialize};
-use sqlx::FromRow;
-use sqlx::SqlitePool;
-use sqlx::Row;
 
 use pokemon_tcg_sdk::{ Client, Query};
 use pokemon_tcg_sdk::models::models::{ sv_sets, swsh_sets, DataCardMap, Card, CardToPrice, Set };
 use pokemon_tcg_sdk::models::errors::Error;
 
-use sqlx::{migrate::MigrateDatabase, Sqlite};
+use sqlx::{migrate::MigrateDatabase, FromRow, Row, Sqlite, SqlitePool};
 
-//const DB_URL: &'static str = dotenv("DATABASE_URL");
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -140,7 +136,8 @@ async fn check_db_data(db_url: &String) -> Result<(), String> {
 
 async fn insert_card(db_url: &String, card: DBCard) -> Result<(), String> {
     let db = SqlitePool::connect(&db_url).await.unwrap();
-    let result = sqlx::query("INSERT INTO cards (name, card_id, last_price, date) VALUES (?)")
+    sqlx::query("CREATE TABLE IF NOT EXISTS cards (id INTEGER PRIMARY KEY NOT NULL, name VARCHAR(250) NOT NULL, card_id VARCHAR(250) NOT NULL, last_price REAL NOT NULL, date INTEGER);").execute(&db).await.unwrap();
+    let result = sqlx::query("INSERT INTO cards (name, card_id, last_price, date) VALUES (?, ?, ?, ?)")
         .bind(&card.name)
         .bind(&card.card_id)
         .bind(&card.last_price)
@@ -171,7 +168,7 @@ async fn fetch_prices(key: String, db_url: &String, cards: Vec<CardToPrice>) -> 
         let date = Utc::now().timestamp();
 
         if let Some(c) = maybe_card {
-            let mut db_card = DBCard::new(c.name.clone().unwrap(), format!("{id}-{number}"), date);
+            let mut db_card = DBCard::new(c.name.clone().unwrap(), format!("{id}"), date);
             db_card.last_price = extract_price(&c);
             insert_card(db_url, db_card).await;
 
@@ -310,6 +307,7 @@ async fn main() -> Result<(), Error> {
                                         .map(|s| s.to_string());
         },
         Some(("price", submatches)) => {
+            setup_db(&DB_URL);
             let price = submatches.get_one::<String>("PRICE").unwrap();
             let price_path = PathBuf::from(price);
 
@@ -342,6 +340,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_database() {
-        
+        let url = "sqlite://card_prices.db";
+        setup_db(&url); 
     }
 }

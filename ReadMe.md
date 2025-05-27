@@ -33,6 +33,7 @@ let _types: Vec<Type> = api.all::<Type>().await;
 - clap
 - tokio
 - regex
+- sqlx
 
 > NOTE: tokio, clap and regex are used almost exclusively for the CLI whereas reqwest & serde are considered core.
 
@@ -40,5 +41,12 @@ let _types: Vec<Type> = api.all::<Type>().await;
 
 Testing command
 ```bash
-POKEMON_TCG_API_KEY=KEY_HERE RUST_BACKTRACE=full cargo test -- --show-output
+POKEMON_TCG_API_KEY=KEY_HERE DATABASE_URL=URL_HERE RUST_BACKTRACE=full cargo test -- --show-output
+```
+
+Running the local price tracker with SQLite DB 
+```bash
+cargo add sqlx-cli
+DATABASE_URL=sqlite://URL_HERE sqlx db create #create the DB first
+POKEMON_TCG_API_KEY=KEY_HERE DATABASE_URL=sqlite://URL_HERE cargo run -- price /path/to/cards_to_track.txt
 ```

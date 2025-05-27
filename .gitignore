@@ -1,2 +1,6 @@
 /target
 *.env
+.DS_STORE
+*.db
+*.db-shm
+*.db-wal
