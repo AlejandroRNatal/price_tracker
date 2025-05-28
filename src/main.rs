@@ -10,9 +10,9 @@ use regex::Regex;
 
 use serde::{ Serialize, Deserialize };
 
-use pokemon_tcg_sdk::{ Client, Query };
-use pokemon_tcg_sdk::models::models::{ sv_sets, swsh_sets, DataCardMap, Card, CardToPrice, Set };
-use pokemon_tcg_sdk::models::errors::Error;
+use pokemon_tcg_sdk_rs::{ Client, Query };
+use pokemon_tcg_sdk_rs::models::models::{ sv_sets, swsh_sets, DataCardMap, Card, CardToPrice, Set };
+use pokemon_tcg_sdk_rs::models::errors::Error;
 
 use sqlx::{ migrate::MigrateDatabase, FromRow, Row, Sqlite, SqlitePool };
 
