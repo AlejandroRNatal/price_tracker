@@ -2,19 +2,19 @@ use std::io::Write;
 use std::fs::OpenOptions;
 use std::path::PathBuf;
 
-use clap::{arg, Command, Parser};
+use clap::{ arg, Command, Parser };
 use chrono::prelude::*;
 use dotenv::dotenv;
 
 use regex::Regex;
 
-use serde::{Serialize, Deserialize};
+use serde::{ Serialize, Deserialize };
 
-use pokemon_tcg_sdk::{ Client, Query};
+use pokemon_tcg_sdk::{ Client, Query };
 use pokemon_tcg_sdk::models::models::{ sv_sets, swsh_sets, DataCardMap, Card, CardToPrice, Set };
 use pokemon_tcg_sdk::models::errors::Error;
 
-use sqlx::{migrate::MigrateDatabase, FromRow, Row, Sqlite, SqlitePool};
+use sqlx::{ migrate::MigrateDatabase, FromRow, Row, Sqlite, SqlitePool };
 
 
 #[derive(Parser, Debug)]
@@ -69,6 +69,7 @@ impl DBCard {
     } 
 }
 
+/// Extract the TCG Player price of a Card if it exists.
 fn extract_price(card: &Card) -> f64 {
     match &card.tcgplayer {
         Some(tcgp) => {
@@ -81,13 +82,6 @@ fn extract_price(card: &Card) -> f64 {
                             return -999.99;
                         }
                     }
-                    /*else if let Some(reverse) = prices.reverseHolofoil {
-                        if let Some(market) = reverse.market {
-                            return market as f64;
-                        } else {
-                            return -999.99;
-                        }
-                    }*/
                     else {
                         return -999.99;
                     }
@@ -174,7 +168,7 @@ async fn fetch_prices(key: String, db_url: &String, cards: Vec<CardToPrice>) -> 
 
             let buff = format!("{} {}", time, c);
             file.write_all(buff.as_str().as_bytes())
-                .map_err(|_| { Error::FailedParsingFile })?;    
+                .map_err(|_| { Error::FailedParsingFile })?;
         }
     }
     
@@ -307,7 +301,7 @@ async fn main() -> Result<(), Error> {
                                         .map(|s| s.to_string());
         },
         Some(("price", submatches)) => {
-            setup_db(&DB_URL);
+            setup_db(&DB_URL).await;
             let price = submatches.get_one::<String>("PRICE").unwrap();
             let price_path = PathBuf::from(price);
 
@@ -337,10 +331,15 @@ async fn main() -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     #[tokio::test]
     async fn test_database() {
-        let url = "sqlite://card_prices.db";
-        setup_db(&url); 
+        let db_name = "card_prices.db".to_string();
+        let url = "sqlite://card_prices.db".to_string();
+        setup_db(&url).await;
+
+        // check that the DB file exists
+        assert!(fs::exists(db_name).unwrap_or(false));
     }
 }
