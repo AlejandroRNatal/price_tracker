@@ -1,8 +1,7 @@
 # Price Tracker
 A Command Line Interface for checking the daily price of cards in a file.
 
-The primary CLI component is the main.rs file.
-However, the project contains a client subdirectory that stores all the querying logic for the opensource [Pokemon TCG API](https://docs.pokemontcg.io/). There are future plans to convert the client module into its own standalone library.
+However, the project contains a client subdirectory that stores all the querying logic for the opensource [Pokemon TCG API](https://docs.pokemontcg.io/). 
 
 ## CLI Usage
 
@@ -39,6 +38,27 @@ let _types: Vec<Type> = api.all::<Type>().await;
 
 ## Dev
 
+We require OpenSSL installed if we want to develop Leptos
+
+# macOS
+`$ brew install openssl@1.1`
+
+# Arch Linux
+`$ sudo pacman -S pkg-config openssl`
+
+# Debian and Ubuntu
+`$ sudo apt-get install pkg-config libssl-dev`
+
+# Fedora
+`$ sudo dnf install pkg-config openssl-devel`
+
+To compile, you must include wasm32 in your rust toolchain
+
+`rustup target wasm32-unknown-unknown`
+
+
+---
+
 Testing command
 ```bash
 POKEMON_TCG_API_KEY=KEY_HERE DATABASE_URL=URL_HERE RUST_BACKTRACE=full cargo test -- --show-output
@@ -49,4 +69,9 @@ Running the local price tracker with SQLite DB
 cargo add sqlx-cli
 DATABASE_URL=sqlite://URL_HERE sqlx db create #create the DB first
 POKEMON_TCG_API_KEY=KEY_HERE DATABASE_URL=sqlite://URL_HERE cargo run -- price /path/to/cards_to_track.txt
+```
+
+## Running Leptos
+```bash
+trunk serve --open
 ```
